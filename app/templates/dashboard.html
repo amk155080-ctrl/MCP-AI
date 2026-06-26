@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>MCP Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{
+    font-family: Arial, sans-serif;
+    margin:40px;
+    background:#f5f5f5;
+}
+
+.card{
+    background:white;
+    padding:20px;
+    margin-bottom:20px;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(0,0,0,0.1);
+}
+
+.grid{
+    display:grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap:20px;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th,td{
+    border:1px solid #ddd;
+    padding:8px;
+    text-align:center;
+}
+
+th{
+    background:#efefef;
+}
+
+a{
+    color:#005bbb;
+    font-weight:bold;
+    text-decoration:none;
+}
+
+a:hover{
+    text-decoration:underline;
+}
+
+.ready{
+    color:green;
+    font-weight:bold;
+}
+
+.wait{
+    color:red;
+    font-weight:bold;
+}
+
+.ok{
+    color:green;
+    font-weight:bold;
+}
+
+.warning{
+    color:#d98200;
+    font-weight:bold;
+}
+
+canvas{
+    max-height:320px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+<h1>MCP 7.8 투자 차트 대시보드</h1>
+
+<p>
+상태 :
+<span class="ready">
+{{ dashboard_status }}
+</span>
+</p>
+
+<p>전략등급 : {{ strategy_grade }}</p>
+<p>실행판단 : {{ final_execution }}</p>
+<p>TOP PICK : {{ top_stock_name }}</p>
+
+<p>주문금액 : {{ safe_total_order_amount }}</p>
+<p>현금 : {{ cash }}</p>
+<p>손실률 : {{ safe_portfolio_loss_percent }}%</p>
+</div>
+
+<div class="grid">
+
+<div class="card">
+<h2>손실률 비교</h2>
+<canvas id="lossChart"></canvas>
+</div>
+
+<div class="card">
+<h2>자금 배분</h2>
+<canvas id="capitalChart"></canvas>
+</div>
+
+</div>
+
+<div class="grid">
+
+<div class="card">
+<h2>TOP5 위원회 점수</h2>
+<canvas id="scoreChart"></canvas>
+</div>
+
+<div class="card">
+<h2>스마트머니 유입</h2>
+<canvas id="smartMoneyChart"></canvas>
+</div>
+
+</div>
+
+<div class="card">
+<h2>추천 종목</h2>
+
+<table>
+<tr>
+<th>종목</th>
+<th>위원회점수</th>
+<th>스마트머니</th>
+<th>신호</th>
+<th>진입상태</th>
+</tr>
+
+{% for item in recommendations %}
+<tr>
+<td>
+<a href="/dashboard/stock/{{ item.stock_code }}">
+{{ item.stock_name }}
+</a>
+</td>
+<td>{{ item.committee_score }}</td>
+<td>{{ item.smart_money_net_text }}</td>
+<td>{{ item.final_signal }}</td>
+<td>
+{% if item.entry_status == "ENTRY_OK" %}
+<span class="ok">{{ item.entry_status }}</span>
+{% elif item.entry_status == "ENTRY_WAIT" %}
+<span class="warning">{{ item.entry_status }}</span>
+{% else %}
+<span class="wait">{{ item.entry_status }}</span>
+{% endif %}
+</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+
+<script>
+const rawLoss = {{ raw_portfolio_loss_percent }};
+const safeLoss = {{ safe_portfolio_loss_percent }};
+
+const safeOrderAmount = {{ safe_total_order_amount_number }};
+const cashAmount = {{ cash_number }};
+
+const stockNames = {{ stock_names | safe }};
+const committeeScores = {{ committee_scores | safe }};
+const smartMoneyValues = {{ smart_money_values | safe }};
+
+new Chart(document.getElementById('lossChart'), {
+    type: 'bar',
+    data: {
+        labels: ['원래 손실률', '안전 손실률'],
+        datasets: [{
+            label: '손실률 (%)',
+            data: [rawLoss, safeLoss]
+        }]
+    }
+});
+
+new Chart(document.getElementById('capitalChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['안전 주문금액', '현금'],
+        datasets: [{
+            data: [safeOrderAmount, cashAmount]
+        }]
+    }
+});
+
+new Chart(document.getElementById('scoreChart'), {
+    type: 'bar',
+    data: {
+        labels: stockNames,
+        datasets: [{
+            label: '위원회 점수',
+            data: committeeScores
+        }]
+    },
+    options: {
+        scales: {
+            y: {
+                min: 60,
+                max: 100
+            }
+        }
+    }
+});
+
+new Chart(document.getElementById('smartMoneyChart'), {
+    type: 'bar',
+    data: {
+        labels: stockNames,
+        datasets: [{
+            label: '스마트머니 유입',
+            data: smartMoneyValues
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return context.raw.toLocaleString() + '원';
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+
+</body>
+</html>

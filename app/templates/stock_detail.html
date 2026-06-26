@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Stock Detail</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{
+    font-family:Arial, sans-serif;
+    margin:40px;
+    background:#f5f5f5;
+}
+
+.card{
+    background:white;
+    padding:20px;
+    margin-bottom:20px;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(0,0,0,0.1);
+}
+
+.grid{
+    display:grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap:20px;
+}
+
+.ok{
+    color:green;
+    font-weight:bold;
+}
+
+.warning{
+    color:#d98200;
+    font-weight:bold;
+}
+
+.bad{
+    color:red;
+    font-weight:bold;
+}
+
+.back{
+    display:inline-block;
+    margin-bottom:20px;
+    color:#005bbb;
+    text-decoration:none;
+    font-weight:bold;
+}
+
+.back:hover{
+    text-decoration:underline;
+}
+
+canvas{
+    max-height:320px;
+}
+
+.metric{
+    font-size:18px;
+    margin:8px 0;
+}
+
+.money{
+    font-size:22px;
+    font-weight:bold;
+    color:#005bbb;
+}
+</style>
+</head>
+
+<body>
+
+<a class="back" href="/dashboard">← 대시보드로 돌아가기</a>
+
+<div class="card">
+
+<h1>{{ stock_name }} ({{ stock_code }})</h1>
+
+<p class="metric">위원회 점수 : {{ committee_score }}</p>
+<p class="metric">신호 : {{ signal }}</p>
+
+<p class="metric">
+진입상태 :
+{% if entry_status == "ENTRY_OK" %}
+<span class="ok">{{ entry_status }}</span>
+{% elif entry_status == "ENTRY_WAIT" %}
+<span class="warning">{{ entry_status }}</span>
+{% else %}
+<span class="bad">{{ entry_status }}</span>
+{% endif %}
+</p>
+
+<p class="metric">리스크 점수 : {{ risk_score }}</p>
+<p class="metric">신뢰도 : {{ confidence }}</p>
+
+</div>
+
+<div class="grid">
+
+<div class="card">
+<h2>목표가 / 손절가</h2>
+<canvas id="priceChart"></canvas>
+</div>
+
+<div class="card">
+<h2>종합 점수</h2>
+<canvas id="scoreChart"></canvas>
+</div>
+
+</div>
+
+<div class="grid">
+
+<div class="card">
+<h2>스마트머니</h2>
+<p class="money">{{ smart_money }}</p>
+</div>
+
+<div class="card">
+<h2>손익 구조</h2>
+<p>목표가 : {{ target_price }}</p>
+<p>손절가 : {{ stop_loss }}</p>
+<p>예상 상승률 : {{ upside }}%</p>
+<p>예상 손실률 : {{ downside }}%</p>
+<p>손익비 : {{ payoff }}</p>
+</div>
+
+</div>
+
+<script>
+const targetPrice = {{ target_price_number }};
+const stopLoss = {{ stop_loss_number }};
+
+const committeeScore = {{ committee_score }};
+const riskScore = {{ risk_score }};
+const confidence = {{ confidence }};
+
+new Chart(document.getElementById('priceChart'), {
+    type: 'bar',
+    data: {
+        labels: ['목표가', '손절가'],
+        datasets: [{
+            label: '가격',
+            data: [targetPrice, stopLoss]
+        }]
+    },
+    options: {
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return context.raw.toLocaleString() + '원';
+                    }
+                }
+            }
+        }
+    }
+});
+
+new Chart(document.getElementById('scoreChart'), {
+    type: 'bar',
+    data: {
+        labels: ['위원회 점수', '리스크 점수', '신뢰도'],
+        datasets: [{
+            label: '점수',
+            data: [committeeScore, riskScore, confidence]
+        }]
+    },
+    options: {
+        scales: {
+            y: {
+                min: 0,
+                max: 100
+            }
+        }
+    }
+});
+</script>
+
+</body>
+</html>

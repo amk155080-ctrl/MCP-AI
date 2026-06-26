@@ -1,0 +1,22 @@
+from sqlalchemy import Column, Integer, String, Numeric, DateTime
+from datetime import datetime
+
+from app.core.database import Base
+
+
+class AssetAccount(Base):
+    __tablename__ = "asset_account"
+    __table_args__ = {"schema": "mcp4"}
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    asset_type = Column(String(30), nullable=False)
+    asset_name = Column(String(100), nullable=False)
+
+    quantity = Column(Numeric(20, 4), default=0)
+    amount = Column(Numeric(20, 2), default=0)
+
+    currency = Column(String(10), default="KRW")
+    memo = Column(String(255), nullable=True)
+
+    updated_at = Column(DateTime, default=datetime.utcnow)
