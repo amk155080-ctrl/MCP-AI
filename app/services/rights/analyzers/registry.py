@@ -18,6 +18,7 @@ class AnalyzerRegistry:
         self.analyzers = [
             BaseRightAnalyzer(),
             TenantAnalyzer(),
+            OccupancyAnalyzer(),
         ]
 
     def get_analyzers(self) -> List:
