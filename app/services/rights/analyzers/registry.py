@@ -3,6 +3,7 @@ from typing import List
 from app.services.rights.analyzers.base_right import BaseRightAnalyzer
 from app.services.rights.analyzers.tenant import TenantAnalyzer
 from app.services.rights.analyzers.occupancy import OccupancyAnalyzer
+from app.services.rights.analyzers.deposit import DepositAnalyzer
 
 
 class AnalyzerRegistry:
