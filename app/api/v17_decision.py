@@ -108,6 +108,107 @@ def _save_decision_result(
     db.commit()
     return saved_id
 
+@router.get("/decision/results")
+def list_decision_results(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+):
+    rows = db.execute(
+        text("""
+            SELECT
+                id,
+                document_id,
+                auction_id,
+                rights_result_id,
+                appraisal_price,
+                minimum_bid_price,
+                expected_sale_price,
+                rights_score,
+                recommended_bid,
+                expected_profit,
+                expected_roi,
+                profit_score,
+                risk_score,
+                auction_score,
+                decision,
+                confidence,
+                created_at
+            FROM auction_decision_results
+            ORDER BY created_at DESC, id DESC
+            LIMIT :limit
+        """),
+        {"limit": limit},
+    ).mappings().all()
+
+    return {
+        "found": True,
+        "version": "MCP 17.3",
+        "count": len(rows),
+        "items": [dict(row) for row in rows],
+        "message": "경매 종합 판정 결과 목록 조회 완료",
+    }
+
+
+@router.get("/decision/result/latest/{document_id}")
+def get_latest_decision_result_by_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+    row = db.execute(
+        text("""
+            SELECT *
+            FROM auction_decision_results
+            WHERE document_id = :document_id
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+        """),
+        {"document_id": document_id},
+    ).mappings().first()
+
+    if not row:
+        return {
+            "found": False,
+            "version": "MCP 17.3",
+            "document_id": document_id,
+            "message": "저장된 경매 종합 판정 결과가 없습니다.",
+        }
+
+    return {
+        "found": True,
+        "version": "MCP 17.3",
+        "result": dict(row),
+        "message": "최신 경매 종합 판정 결과 조회 완료",
+    }
+
+
+@router.get("/decision/result/{result_id}")
+def get_decision_result(
+    result_id: int,
+    db: Session = Depends(get_db),
+):
+    row = db.execute(
+        text("""
+            SELECT *
+            FROM auction_decision_results
+            WHERE id = :result_id
+        """),
+        {"result_id": result_id},
+    ).mappings().first()
+
+    if not row:
+        return {
+            "found": False,
+            "version": "MCP 17.3",
+            "result_id": result_id,
+            "message": "경매 종합 판정 결과가 없습니다.",
+        }
+
+    return {
+        "found": True,
+        "version": "MCP 17.3",
+        "result": dict(row),
+        "message": "경매 종합 판정 결과 상세 조회 완료",
+    }
 
 @router.get("/decision")
 def auction_decision(
