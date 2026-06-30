@@ -3,17 +3,10 @@ from typing import Dict, Tuple
 
 
 class DepositAnalyzer:
-    """
-    MCP16 Deposit Analyzer
+    VERSION = "MCP16-DEPOSIT-1.2"
 
-    OCR Text에서 보증금/임대차보증금/전세금/deposit 값을 추출합니다.
-    """
-
-    VERSION = "MCP16-DEPOSIT-1.1"
-
-    def analyze(self, text: str) -> Dict:
+    def analyze(self, text: str, context: Dict = None) -> Dict:
         text = text or ""
-
         amount, source = self._extract_deposit(text)
 
         return {
