@@ -221,6 +221,107 @@ def analyze_rights_v2(
         "message": "Rights Engine V2 분석 및 저장 완료",
     }
 
+def _build_rights_v2_report(row: dict) -> dict:
+    score = row.get("rights_score")
+    risk_level = row.get("risk_level")
+    recommendation = row.get("recommendation")
+
+    if risk_level == "LOW":
+        headline = "권리상 위험이 낮아 입찰 검토가 가능합니다."
+    elif risk_level == "MEDIUM":
+        headline = "일부 권리 위험이 있어 주의 검토가 필요합니다."
+    else:
+        headline = "권리상 위험이 높아 입찰 보류가 필요합니다."
+
+    return {
+        "title": "MCP16 Rights V2 권리분석 리포트",
+        "headline": headline,
+        "result_id": row.get("id"),
+        "document_id": row.get("document_id"),
+        "auction_id": row.get("auction_id"),
+        "score": score,
+        "risk_level": risk_level,
+        "recommendation": recommendation,
+        "base_right": row.get("base_right"),
+        "tenant_priority": row.get("tenant_priority"),
+        "occupancy": row.get("occupancy"),
+        "takeover": {
+            "required": row.get("takeover_required"),
+            "amount": row.get("takeover_amount"),
+        },
+        "legal_risk": {
+            "count": row.get("legal_risk_count"),
+            "items": row.get("legal_risks"),
+        },
+        "summary": row.get("summary"),
+        "created_at": row.get("created_at"),
+    }
+
+
+@router.get("/report/{result_id}")
+def get_rights_v2_report(
+    result_id: int,
+    db: Session = Depends(get_db),
+):
+    row = db.execute(
+        text("""
+            SELECT *
+            FROM rights_v2_results
+            WHERE id = :result_id
+        """),
+        {"result_id": result_id},
+    ).mappings().first()
+
+    if not row:
+        return {
+            "found": False,
+            "version": "MCP 16.8",
+            "result_id": result_id,
+            "message": "리포트를 생성할 분석 결과가 없습니다.",
+        }
+
+    report = _build_rights_v2_report(dict(row))
+
+    return {
+        "found": True,
+        "version": "MCP 16.8",
+        "report": report,
+        "message": "Rights V2 리포트 생성 완료",
+    }
+
+
+@router.get("/report/latest/{document_id}")
+def get_latest_rights_v2_report(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+    row = db.execute(
+        text("""
+            SELECT *
+            FROM rights_v2_results
+            WHERE document_id = :document_id
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+        """),
+        {"document_id": document_id},
+    ).mappings().first()
+
+    if not row:
+        return {
+            "found": False,
+            "version": "MCP 16.8",
+            "document_id": document_id,
+            "message": "리포트를 생성할 최신 분석 결과가 없습니다.",
+        }
+
+    report = _build_rights_v2_report(dict(row))
+
+    return {
+        "found": True,
+        "version": "MCP 16.8",
+        "report": report,
+        "message": "최신 Rights V2 리포트 생성 완료",
+    }
 
 @router.get("/{document_id}")
 def analyze_rights_v2_legacy(
