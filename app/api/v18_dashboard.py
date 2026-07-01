@@ -156,6 +156,70 @@ td {{
 </html>
 """
 
+def _build_bid_checklist(data: dict) -> list:
+    rights = data["rights"]
+    decision = data["decision"]
+
+    checklist = []
+
+    checklist.append({
+        "category": "권리분석",
+        "item": "말소기준권리 확인",
+        "status": "PASS" if rights["base_right"] != "말소기준권리 없음" else "CHECK",
+        "comment": rights["base_right"],
+    })
+
+    checklist.append({
+        "category": "권리분석",
+        "item": "임차인 권리 확인",
+        "status": "PASS" if rights["tenant_priority"] == "임차인 없음" else "CHECK",
+        "comment": rights["tenant_priority"],
+    })
+
+    checklist.append({
+        "category": "점유/명도",
+        "item": "점유상태 확인",
+        "status": "PASS" if rights["occupancy"] in ["소유자 점유", "임차인 없음"] else "CHECK",
+        "comment": rights["occupancy"],
+    })
+
+    checklist.append({
+        "category": "인수위험",
+        "item": "인수금액 확인",
+        "status": "PASS" if (rights["takeover_amount"] or 0) == 0 else "RISK",
+        "comment": f'{rights["takeover_amount"] or 0:,}원',
+    })
+
+    checklist.append({
+        "category": "수익성",
+        "item": "예상 수익률 확인",
+        "status": "PASS" if decision["expected_roi"] >= 15 else "CHECK",
+        "comment": f'{decision["expected_roi"]}%',
+    })
+
+    checklist.append({
+        "category": "수익성",
+        "item": "예상 수익 확인",
+        "status": "PASS" if decision["expected_profit"] > 0 else "RISK",
+        "comment": f'{decision["expected_profit"]:,}원',
+    })
+
+    checklist.append({
+        "category": "입찰가",
+        "item": "추천 입찰가 확인",
+        "status": "PASS" if decision["recommended_bid"] > 0 else "CHECK",
+        "comment": f'{decision["recommended_bid"]:,}원',
+    })
+
+    checklist.append({
+        "category": "최종판단",
+        "item": "AI 최종 판단 확인",
+        "status": "PASS" if decision["decision"] == "BID" else "CHECK",
+        "comment": decision["decision"],
+    })
+
+    return checklist
+
 @router.get("/dashboard/{document_id}")
 def auction_dashboard(
     document_id: int,
@@ -263,3 +327,45 @@ def dashboard_html(
     html = _build_dashboard_html(response)
 
     return HTMLResponse(html)
+
+@router.get("/dashboard/checklist/{document_id}")
+def dashboard_checklist(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+    response = auction_dashboard(
+        document_id=document_id,
+        db=db,
+    )
+
+    if not response["found"]:
+        return response
+
+    checklist = _build_bid_checklist(response)
+
+    risk_count = len([
+        item for item in checklist
+        if item["status"] == "RISK"
+    ])
+
+    check_count = len([
+        item for item in checklist
+        if item["status"] == "CHECK"
+    ])
+
+    pass_count = len([
+        item for item in checklist
+        if item["status"] == "PASS"
+    ])
+
+    return {
+        "found": True,
+        "version": "MCP 18.3",
+        "document_id": document_id,
+        "auction_id": response.get("auction_id"),
+        "pass_count": pass_count,
+        "check_count": check_count,
+        "risk_count": risk_count,
+        "items": checklist,
+        "message": "입찰 전 체크리스트 생성 완료",
+    }
