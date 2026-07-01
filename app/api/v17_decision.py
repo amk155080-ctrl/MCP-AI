@@ -389,6 +389,43 @@ def get_latest_decision_report(
         "report": report,
         "message": "최신 경매 종합 판정 리포트 생성 완료",
     }
+@router.get("/decision/summary")
+def decision_summary(
+    db: Session = Depends(get_db),
+):
+    total_count = db.execute(
+        text("""
+            SELECT COUNT(*) AS count
+            FROM auction_decision_results
+        """)
+    ).mappings().first()
+
+    latest = db.execute(
+        text("""
+            SELECT *
+            FROM auction_decision_results
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+        """)
+    ).mappings().first()
+
+    decision_stats = db.execute(
+        text("""
+            SELECT decision, COUNT(*) AS count
+            FROM auction_decision_results
+            GROUP BY decision
+            ORDER BY count DESC
+        """)
+    ).mappings().all()
+
+    return {
+        "found": True,
+        "version": "MCP 17.5",
+        "total_count": total_count.get("count") if total_count else 0,
+        "latest": dict(latest) if latest else None,
+        "decision_stats": [dict(row) for row in decision_stats],
+        "message": "MCP17 경매 종합 판정 요약 조회 완료",
+    }
 
 @router.get("/decision/report/html/{result_id}", response_class=HTMLResponse)
 def get_decision_html_report(
