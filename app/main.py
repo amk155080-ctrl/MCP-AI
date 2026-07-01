@@ -23,6 +23,7 @@ from app.api.v15_auction_rights import router as v15_auction_rights_router
 from app.api.v15_auction_import import router as v15_auction_import_router
 from app.api.v16_document import router as v16_document_router
 from app.api import rights_ai
+from app.api.v18_dashboard import router as v18_dashboard_router
 
 app = FastAPI(title="MCP 4.0 v1", version="1.0.0")
 
@@ -46,6 +47,7 @@ app.include_router(v15_auction_import_router)
 app.include_router(v16_document_router)
 app.include_router(rights_ai.router)
 app.include_router(rights_ai.router)
+app.include_router(v18_dashboard_router)
 
 from app.api.v3.portfolio import router as portfolio_v3_router
 app.include_router(portfolio_v3_router)
