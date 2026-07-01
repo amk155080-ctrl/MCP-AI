@@ -343,3 +343,99 @@ def auction_case_portfolio_ranking(
         "items": [dict(row) for row in rows],
         "message": "경매 후보 물건 포트폴리오 랭킹 조회 완료",
     }
+@router.get("/{case_id}/integrated-report")
+def get_case_integrated_report(
+    case_id: int,
+    db: Session = Depends(get_db),
+):
+    case_row = db.execute(
+        text("""
+            SELECT *
+            FROM auction_cases
+            WHERE id = :case_id
+        """),
+        {"case_id": case_id},
+    ).mappings().first()
+
+    if not case_row:
+        return {
+            "found": False,
+            "version": "MCP 19.6",
+            "case_id": case_id,
+            "message": "후보 물건을 찾을 수 없습니다.",
+        }
+
+    case = dict(case_row)
+    document_id = case.get("document_id")
+
+    if not document_id:
+        return {
+            "found": False,
+            "version": "MCP 19.6",
+            "case_id": case_id,
+            "message": "후보 물건에 document_id가 연결되어 있지 않습니다.",
+        }
+
+    rights_row = db.execute(
+        text("""
+            SELECT *
+            FROM rights_v2_results
+            WHERE document_id = :document_id
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+        """),
+        {"document_id": document_id},
+    ).mappings().first()
+
+    decision_row = db.execute(
+        text("""
+            SELECT *
+            FROM auction_decision_results
+            WHERE document_id = :document_id
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+        """),
+        {"document_id": document_id},
+    ).mappings().first()
+
+    if not rights_row or not decision_row:
+        return {
+            "found": False,
+            "version": "MCP 19.6",
+            "case_id": case_id,
+            "document_id": document_id,
+            "message": "MCP16 또는 MCP17 분석 결과가 부족합니다.",
+        }
+
+    rights = dict(rights_row)
+    decision = dict(decision_row)
+
+    return {
+        "found": True,
+        "version": "MCP 19.6",
+        "case": case,
+        "rights": {
+            "rights_result_id": rights.get("id"),
+            "rights_score": rights.get("rights_score"),
+            "risk_level": rights.get("risk_level"),
+            "recommendation": rights.get("recommendation"),
+            "summary": rights.get("summary"),
+        },
+        "decision": {
+            "decision_result_id": decision.get("id"),
+            "auction_score": decision.get("auction_score"),
+            "decision": decision.get("decision"),
+            "recommended_bid": decision.get("recommended_bid"),
+            "expected_profit": decision.get("expected_profit"),
+            "expected_roi": decision.get("expected_roi"),
+            "summary": decision.get("summary"),
+        },
+        "summary": (
+            f"{case.get('case_no')} 후보 물건은 "
+            f"권리점수 {rights.get('rights_score')}점, "
+            f"경매 종합점수 {decision.get('auction_score')}점입니다. "
+            f"최종 판단은 {decision.get('decision')}이며, "
+            f"추천 입찰가는 {decision.get('recommended_bid'):,}원입니다."
+        ),
+        "message": "후보 물건 통합 리포트 조회 완료",
+    }
