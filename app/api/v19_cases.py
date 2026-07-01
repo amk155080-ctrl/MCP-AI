@@ -165,3 +165,60 @@ def get_auction_case_by_document(
         "case": dict(row),
         "message": "document_id 기반 후보 물건 조회 완료",
     }
+@router.put("/{case_id}/status")
+def update_case_status(
+    case_id: int,
+    status: str,
+    memo: str = "",
+    db: Session = Depends(get_db),
+):
+    row = db.execute(
+        text("""
+            SELECT id
+            FROM auction_cases
+            WHERE id=:case_id
+        """),
+        {"case_id": case_id},
+    ).first()
+
+    if not row:
+        return {
+            "found": False,
+            "version": "MCP 19.4",
+            "case_id": case_id,
+            "message": "후보 물건을 찾을 수 없습니다.",
+        }
+
+    db.execute(
+        text("""
+            UPDATE auction_cases
+            SET
+                status=:status,
+                memo=:memo,
+                updated_at=NOW()
+            WHERE id=:case_id
+        """),
+        {
+            "case_id": case_id,
+            "status": status,
+            "memo": memo,
+        },
+    )
+
+    db.commit()
+
+    updated = db.execute(
+        text("""
+            SELECT *
+            FROM auction_cases
+            WHERE id=:case_id
+        """),
+        {"case_id": case_id},
+    ).mappings().first()
+
+    return {
+        "found": True,
+        "version": "MCP 19.4",
+        "case": dict(updated),
+        "message": "후보 물건 상태 변경 완료",
+    }
