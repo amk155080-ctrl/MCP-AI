@@ -219,6 +219,67 @@ def _build_bid_checklist(data: dict) -> list:
     })
 
     return checklist
+def _build_final_ai_comment(data: dict, checklist: list) -> dict:
+    rights = data["rights"]
+    decision = data["decision"]
+
+    risk_items = [item for item in checklist if item["status"] == "RISK"]
+    check_items = [item for item in checklist if item["status"] == "CHECK"]
+
+    final_decision = decision["decision"]
+    rights_score = rights["rights_score"]
+    auction_score = decision["auction_score"]
+    expected_roi = decision["expected_roi"]
+    expected_profit = decision["expected_profit"]
+    recommended_bid = decision["recommended_bid"]
+
+    if final_decision == "BID":
+        headline = "입찰 검토 가능"
+        comment = (
+            "권리와 수익성 조건이 비교적 양호합니다. "
+            "다만 실제 입찰 전 현장 점유상태, 추가 권리관계, 시세를 다시 확인해야 합니다."
+        )
+    elif final_decision == "CAUTION_BID":
+        headline = "주의 입찰"
+        comment = (
+            "수익성은 있으나 일부 위험요소가 존재합니다. "
+            "추천 입찰가 이하에서만 보수적으로 접근하는 것이 좋습니다."
+        )
+    else:
+        headline = "입찰 보류"
+        comment = (
+            "현재 분석 기준으로는 입찰을 보류하는 것이 안전합니다. "
+            "특히 권리점수, 점유상태, 임차인 권리관계 확인이 필요합니다."
+        )
+
+    if risk_items:
+        risk_summary = "위험 항목이 있어 추가 확인이 필요합니다."
+    elif check_items:
+        risk_summary = "즉시 위험은 아니지만 확인이 필요한 항목이 있습니다."
+    else:
+        risk_summary = "체크리스트 기준 주요 위험 항목은 낮은 편입니다."
+
+    return {
+        "headline": headline,
+        "final_decision": final_decision,
+        "auction_score": auction_score,
+        "rights_score": rights_score,
+        "expected_roi": expected_roi,
+        "expected_profit": expected_profit,
+        "recommended_bid": recommended_bid,
+        "risk_summary": risk_summary,
+        "risk_count": len(risk_items),
+        "check_count": len(check_items),
+        "comment": comment,
+        "action": {
+            "should_bid": final_decision == "BID",
+            "max_bid_price": recommended_bid,
+            "required_checks": [
+                item for item in checklist
+                if item["status"] in ["CHECK", "RISK"]
+            ],
+        },
+    }
 
 @router.get("/dashboard/{document_id}")
 def auction_dashboard(
@@ -368,4 +429,31 @@ def dashboard_checklist(
         "risk_count": risk_count,
         "items": checklist,
         "message": "입찰 전 체크리스트 생성 완료",
+    }
+@router.get("/dashboard/final-comment/{document_id}")
+def dashboard_final_comment(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+    response = auction_dashboard(
+        document_id=document_id,
+        db=db,
+    )
+
+    if not response["found"]:
+        return response
+
+    checklist = _build_bid_checklist(response)
+    final_comment = _build_final_ai_comment(
+        data=response,
+        checklist=checklist,
+    )
+
+    return {
+        "found": True,
+        "version": "MCP 18.4",
+        "document_id": document_id,
+        "auction_id": response.get("auction_id"),
+        "final_comment": final_comment,
+        "message": "최종 AI 코멘트 생성 완료",
     }
