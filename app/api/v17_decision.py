@@ -148,6 +148,120 @@ def list_decision_results(
         "message": "경매 종합 판정 결과 목록 조회 완료",
     }
 
+def _build_decision_report(row: dict) -> dict:
+    decision = row.get("decision")
+    auction_score = row.get("auction_score")
+    expected_roi = row.get("expected_roi")
+    expected_profit = row.get("expected_profit")
+
+    if decision == "BID":
+        headline = "수익성과 위험 조건이 양호하여 입찰 검토가 가능합니다."
+    elif decision == "CAUTION_BID":
+        headline = "수익성은 있으나 일부 위험요소가 있어 보수적 입찰이 필요합니다."
+    else:
+        headline = "현재 조건에서는 입찰을 보류하는 것이 안전합니다."
+
+    return {
+        "title": "MCP17 경매 종합 판정 리포트",
+        "headline": headline,
+        "result_id": row.get("id"),
+        "document_id": row.get("document_id"),
+        "auction_id": row.get("auction_id"),
+        "rights_result_id": row.get("rights_result_id"),
+        "scores": {
+            "auction_score": auction_score,
+            "rights_score": row.get("rights_score"),
+            "profit_score": row.get("profit_score"),
+            "risk_score": row.get("risk_score"),
+            "confidence": row.get("confidence"),
+        },
+        "price": {
+            "appraisal_price": row.get("appraisal_price"),
+            "minimum_bid_price": row.get("minimum_bid_price"),
+            "expected_sale_price": row.get("expected_sale_price"),
+            "recommended_bid": row.get("recommended_bid"),
+            "bid_to_appraisal_rate": row.get("bid_to_appraisal_rate"),
+        },
+        "profit": {
+            "total_cost": row.get("total_cost"),
+            "expected_profit": expected_profit,
+            "expected_roi": expected_roi,
+            "target_roi": row.get("target_roi"),
+        },
+        "risk": {
+            "takeover_amount": row.get("takeover_amount"),
+            "risk_score": row.get("risk_score"),
+        },
+        "decision": decision,
+        "summary": row.get("summary"),
+        "created_at": row.get("created_at"),
+    }
+
+
+@router.get("/decision/report/{result_id}")
+def get_decision_report(
+    result_id: int,
+    db: Session = Depends(get_db),
+):
+    row = db.execute(
+        text("""
+            SELECT *
+            FROM auction_decision_results
+            WHERE id = :result_id
+        """),
+        {"result_id": result_id},
+    ).mappings().first()
+
+    if not row:
+        return {
+            "found": False,
+            "version": "MCP 17.4",
+            "result_id": result_id,
+            "message": "리포트를 생성할 경매 종합 판정 결과가 없습니다.",
+        }
+
+    report = _build_decision_report(dict(row))
+
+    return {
+        "found": True,
+        "version": "MCP 17.4",
+        "report": report,
+        "message": "경매 종합 판정 리포트 생성 완료",
+    }
+
+
+@router.get("/decision/report/latest/{document_id}")
+def get_latest_decision_report(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+    row = db.execute(
+        text("""
+            SELECT *
+            FROM auction_decision_results
+            WHERE document_id = :document_id
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+        """),
+        {"document_id": document_id},
+    ).mappings().first()
+
+    if not row:
+        return {
+            "found": False,
+            "version": "MCP 17.4",
+            "document_id": document_id,
+            "message": "리포트를 생성할 최신 경매 종합 판정 결과가 없습니다.",
+        }
+
+    report = _build_decision_report(dict(row))
+
+    return {
+        "found": True,
+        "version": "MCP 17.4",
+        "report": report,
+        "message": "최신 경매 종합 판정 리포트 생성 완료",
+    }
 
 @router.get("/decision/result/latest/{document_id}")
 def get_latest_decision_result_by_document(
