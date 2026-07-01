@@ -304,6 +304,163 @@ def _build_final_report(data: dict) -> dict:
         "summary": data.get("summary"),
     }
 
+def _build_final_report_html(report: dict) -> str:
+
+    rights = report["rights"]
+    decision = report["decision"]
+    checklist = report["checklist"]
+    final_comment = report["final_comment"]
+
+    checklist_rows = ""
+
+    for item in checklist["items"]:
+        checklist_rows += f"""
+<tr>
+<td>{item["category"]}</td>
+<td>{item["item"]}</td>
+<td>{item["status"]}</td>
+<td>{item["comment"]}</td>
+</tr>
+"""
+
+    return f"""
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+
+<meta charset="utf-8">
+
+<title>MCP18 Integrated Auction Report</title>
+
+<style>
+
+body {{
+    font-family: Arial, sans-serif;
+    margin:40px;
+    background:#f5f5f5;
+}}
+
+.container {{
+    background:white;
+    padding:30px;
+    border-radius:10px;
+}}
+
+.section {{
+    margin-top:25px;
+    padding:20px;
+    border:1px solid #ddd;
+    border-radius:8px;
+}}
+
+.score {{
+    font-size:34px;
+    color:#1976d2;
+    font-weight:bold;
+}}
+
+table {{
+    width:100%;
+    border-collapse:collapse;
+}}
+
+th,td {{
+    border:1px solid #ddd;
+    padding:8px;
+}}
+
+.summary {{
+    background:#fafafa;
+    padding:20px;
+    line-height:1.7;
+}}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>MCP18 경매 통합 최종 리포트</h1>
+
+<div class="section">
+
+<h2>권리분석</h2>
+
+<p>권리점수 : <b>{rights["rights_score"]}</b></p>
+
+<p>위험등급 : {rights["risk_level"]}</p>
+
+<p>추천 : {rights["recommendation"]}</p>
+
+</div>
+
+<div class="section">
+
+<h2>경매 종합판정</h2>
+
+<div class="score">
+
+{decision["auction_score"]} 점
+
+</div>
+
+<p>최종판단 : <b>{decision["decision"]}</b></p>
+
+<p>추천 입찰가 : {decision["recommended_bid"]:,} 원</p>
+
+<p>예상 수익 : {decision["expected_profit"]:,} 원</p>
+
+<p>예상 ROI : {decision["expected_roi"]}%</p>
+
+</div>
+
+<div class="section">
+
+<h2>입찰 체크리스트</h2>
+
+<table>
+
+<tr>
+
+<th>구분</th>
+
+<th>항목</th>
+
+<th>상태</th>
+
+<th>내용</th>
+
+</tr>
+
+{checklist_rows}
+
+</table>
+
+</div>
+
+<div class="section summary">
+
+<h2>AI 최종 의견</h2>
+
+<p><b>{final_comment["headline"]}</b></p>
+
+<p>{final_comment["comment"]}</p>
+
+<p>{final_comment["risk_summary"]}</p>
+
+</div>
+
+</div>
+
+</body>
+
+</html>
+"""
+
 @router.get("/dashboard/{document_id}")
 def auction_dashboard(
     document_id: int,
@@ -501,3 +658,28 @@ def dashboard_final_report(
         "report": report,
         "message": "MCP18 통합 최종 리포트 생성 완료",
     }
+@router.get(
+    "/dashboard/final-report/html/{document_id}",
+    response_class=HTMLResponse,
+)
+def dashboard_final_report_html(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+
+    response = dashboard_final_report(
+        document_id=document_id,
+        db=db,
+    )
+
+    if not response["found"]:
+        return HTMLResponse(
+            "<h1>Report Not Found</h1>",
+            status_code=404,
+        )
+
+    html = _build_final_report_html(
+        response["report"]
+    )
+
+    return HTMLResponse(html)
