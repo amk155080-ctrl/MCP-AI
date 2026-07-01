@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.core.database import get_db
+from fastapi.responses import HTMLResponse
 
 
 router = APIRouter(
@@ -439,3 +440,129 @@ def get_case_integrated_report(
         ),
         "message": "후보 물건 통합 리포트 조회 완료",
     }
+
+def _build_case_dashboard_html(data: dict) -> str:
+    case = data["case"]
+    rights = data["rights"]
+    decision = data["decision"]
+
+    return f"""
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>MCP19 Auction Case Dashboard</title>
+<style>
+body {{
+    font-family: Arial, sans-serif;
+    margin: 40px;
+    background: #f5f5f5;
+}}
+.container {{
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+}}
+.section {{
+    margin-top: 25px;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}}
+.score {{
+    font-size: 34px;
+    color: #1976d2;
+    font-weight: bold;
+}}
+table {{
+    width: 100%;
+    border-collapse: collapse;
+}}
+td {{
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}}
+.summary {{
+    background: #fafafa;
+    padding: 20px;
+    line-height: 1.7;
+}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>MCP19 경매 후보 물건 Dashboard</h1>
+
+<div class="section">
+<h2>후보 물건 정보</h2>
+<table>
+<tr><td>사건번호</td><td>{case["case_no"]}</td></tr>
+<tr><td>법원</td><td>{case["court_name"]}</td></tr>
+<tr><td>주소</td><td>{case["property_address"]}</td></tr>
+<tr><td>물건종류</td><td>{case["property_type"]}</td></tr>
+<tr><td>상태</td><td>{case["status"]}</td></tr>
+<tr><td>메모</td><td>{case["memo"]}</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h2>가격 정보</h2>
+<table>
+<tr><td>감정가</td><td>{case["appraisal_price"]:,} 원</td></tr>
+<tr><td>최저입찰가</td><td>{case["minimum_bid_price"]:,} 원</td></tr>
+<tr><td>예상 매각가</td><td>{case["expected_sale_price"]:,} 원</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h2>권리분석</h2>
+<div class="score">{rights["rights_score"]} 점</div>
+<table>
+<tr><td>위험등급</td><td>{rights["risk_level"]}</td></tr>
+<tr><td>추천</td><td>{rights["recommendation"]}</td></tr>
+</table>
+<p>{rights["summary"]}</p>
+</div>
+
+<div class="section">
+<h2>경매 종합판정</h2>
+<div class="score">{decision["auction_score"]} 점</div>
+<table>
+<tr><td>최종판단</td><td>{decision["decision"]}</td></tr>
+<tr><td>추천 입찰가</td><td>{decision["recommended_bid"]:,} 원</td></tr>
+<tr><td>예상 수익</td><td>{decision["expected_profit"]:,} 원</td></tr>
+<tr><td>예상 수익률</td><td>{decision["expected_roi"]}%</td></tr>
+</table>
+<p>{decision["summary"]}</p>
+</div>
+
+<div class="section summary">
+<h2>AI 통합 요약</h2>
+<p>{data["summary"]}</p>
+</div>
+
+</div>
+</body>
+</html>
+"""
+
+@router.get("/{case_id}/dashboard/html", response_class=HTMLResponse)
+def case_dashboard_html(
+    case_id: int,
+    db: Session = Depends(get_db),
+):
+    response = get_case_integrated_report(
+        case_id=case_id,
+        db=db,
+    )
+
+    if not response["found"]:
+        return HTMLResponse(
+            "<h1>Case Dashboard Not Found</h1>",
+            status_code=404,
+        )
+
+    html = _build_case_dashboard_html(response)
+
+    return HTMLResponse(html)
