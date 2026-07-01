@@ -281,6 +281,29 @@ def _build_final_ai_comment(data: dict, checklist: list) -> dict:
         },
     }
 
+def _build_final_report(data: dict) -> dict:
+    checklist = _build_bid_checklist(data)
+    final_comment = _build_final_ai_comment(
+        data=data,
+        checklist=checklist,
+    )
+
+    return {
+        "title": "MCP18 경매 통합 최종 리포트",
+        "document_id": data.get("document_id"),
+        "auction_id": data.get("auction_id"),
+        "rights": data.get("rights"),
+        "decision": data.get("decision"),
+        "checklist": {
+            "pass_count": len([item for item in checklist if item["status"] == "PASS"]),
+            "check_count": len([item for item in checklist if item["status"] == "CHECK"]),
+            "risk_count": len([item for item in checklist if item["status"] == "RISK"]),
+            "items": checklist,
+        },
+        "final_comment": final_comment,
+        "summary": data.get("summary"),
+    }
+
 @router.get("/dashboard/{document_id}")
 def auction_dashboard(
     document_id: int,
@@ -456,4 +479,25 @@ def dashboard_final_comment(
         "auction_id": response.get("auction_id"),
         "final_comment": final_comment,
         "message": "최종 AI 코멘트 생성 완료",
+    }
+@router.get("/dashboard/final-report/{document_id}")
+def dashboard_final_report(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+    response = auction_dashboard(
+        document_id=document_id,
+        db=db,
+    )
+
+    if not response["found"]:
+        return response
+
+    report = _build_final_report(response)
+
+    return {
+        "found": True,
+        "version": "MCP 18.5",
+        "report": report,
+        "message": "MCP18 통합 최종 리포트 생성 완료",
     }
