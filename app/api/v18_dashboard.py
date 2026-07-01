@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.core.database import get_db
+from fastapi.responses import HTMLResponse
 
 
 router = APIRouter(
@@ -31,6 +32,129 @@ def _make_dashboard_summary(
         f"최종 판단은 {decision}입니다."
     )
 
+def _build_dashboard_html(data: dict) -> str:
+
+    rights = data["rights"]
+    decision = data["decision"]
+
+    return f"""
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>MCP18 Auction Dashboard</title>
+
+<style>
+
+body {{
+    font-family: Arial, sans-serif;
+    margin:40px;
+    background:#f5f5f5;
+}}
+
+.container {{
+    background:white;
+    padding:30px;
+    border-radius:10px;
+}}
+
+h1 {{
+    color:#2c3e50;
+}}
+
+.card {{
+    margin-top:20px;
+    padding:20px;
+    border:1px solid #ddd;
+    border-radius:8px;
+}}
+
+.score {{
+    font-size:34px;
+    color:#1976d2;
+    font-weight:bold;
+}}
+
+.summary {{
+    background:#fafafa;
+    padding:15px;
+    line-height:1.7;
+}}
+
+table {{
+    width:100%;
+    border-collapse:collapse;
+}}
+
+td {{
+    padding:8px;
+    border-bottom:1px solid #eee;
+}}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>MCP18 통합 경매 Dashboard</h1>
+
+<div class="card">
+
+<h2>권리분석</h2>
+
+<table>
+
+<tr><td>권리점수</td><td>{rights["rights_score"]}</td></tr>
+<tr><td>위험등급</td><td>{rights["risk_level"]}</td></tr>
+<tr><td>추천</td><td>{rights["recommendation"]}</td></tr>
+<tr><td>말소기준권리</td><td>{rights["base_right"]}</td></tr>
+<tr><td>임차인</td><td>{rights["tenant_priority"]}</td></tr>
+<tr><td>점유</td><td>{rights["occupancy"]}</td></tr>
+
+</table>
+
+</div>
+
+<div class="card">
+
+<h2>경매 종합판정</h2>
+
+<div class="score">
+{decision["auction_score"]} 점
+</div>
+
+<table>
+
+<tr><td>최종판단</td><td>{decision["decision"]}</td></tr>
+
+<tr><td>추천입찰가</td><td>{decision["recommended_bid"]:,} 원</td></tr>
+
+<tr><td>예상수익</td><td>{decision["expected_profit"]:,} 원</td></tr>
+
+<tr><td>예상수익률</td><td>{decision["expected_roi"]}%</td></tr>
+
+<tr><td>신뢰도</td><td>{decision["confidence"]}</td></tr>
+
+</table>
+
+</div>
+
+<div class="card summary">
+
+<h2>AI 종합 의견</h2>
+
+<p>{data["summary"]}</p>
+
+</div>
+
+</div>
+
+</body>
+</html>
+"""
 
 @router.get("/dashboard/{document_id}")
 def auction_dashboard(
@@ -115,3 +239,27 @@ def auction_dashboard(
         ),
         "message": "MCP18 통합 대시보드 조회 완료",
     }
+
+@router.get(
+    "/dashboard/html/{document_id}",
+    response_class=HTMLResponse,
+)
+def dashboard_html(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+
+    response = auction_dashboard(
+        document_id=document_id,
+        db=db,
+    )
+
+    if not response["found"]:
+        return HTMLResponse(
+            "<h1>Dashboard Not Found</h1>",
+            status_code=404,
+        )
+
+    html = _build_dashboard_html(response)
+
+    return HTMLResponse(html)
