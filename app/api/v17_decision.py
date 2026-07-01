@@ -5,6 +5,7 @@ import json
 
 from app.core.database import get_db
 from app.services.auction_decision.engine import analyze_auction_decision
+from fastapi.responses import HTMLResponse
 
 
 router = APIRouter(
@@ -197,6 +198,132 @@ def _build_decision_report(row: dict) -> dict:
         "created_at": row.get("created_at"),
     }
 
+def _build_decision_html_report(report: dict) -> str:
+    return f"""
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>MCP17 Auction Decision Report</title>
+<style>
+body {{
+    font-family: Arial, sans-serif;
+    margin: 40px;
+    background: #f5f5f5;
+}}
+.container {{
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+}}
+h1 {{
+    color: #2c3e50;
+}}
+h2 {{
+    color: #444;
+}}
+.box {{
+    margin-top: 20px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}}
+.score {{
+    font-size: 32px;
+    font-weight: bold;
+    color: #1976d2;
+}}
+.decision {{
+    font-size: 28px;
+    font-weight: bold;
+}}
+.summary {{
+    background: #fafafa;
+    padding: 15px;
+    line-height: 1.6;
+}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>{report["title"]}</h1>
+<h2>{report["headline"]}</h2>
+
+<div class="box">
+    <p><b>최종 판단</b></p>
+    <div class="decision">{report["decision"]}</div>
+</div>
+
+<div class="box">
+    <p><b>경매 종합점수</b></p>
+    <div class="score">{report["scores"]["auction_score"]} 점</div>
+</div>
+
+<div class="box">
+    <p><b>권리점수</b></p>
+    <p>{report["scores"]["rights_score"]} 점</p>
+</div>
+
+<div class="box">
+    <p><b>수익점수</b></p>
+    <p>{report["scores"]["profit_score"]} 점</p>
+</div>
+
+<div class="box">
+    <p><b>위험점수</b></p>
+    <p>{report["scores"]["risk_score"]} 점</p>
+</div>
+
+<div class="box">
+    <p><b>신뢰도</b></p>
+    <p>{report["scores"]["confidence"]} 점</p>
+</div>
+
+<div class="box">
+    <p><b>감정가</b></p>
+    <p>{report["price"]["appraisal_price"]:,} 원</p>
+</div>
+
+<div class="box">
+    <p><b>최저입찰가</b></p>
+    <p>{report["price"]["minimum_bid_price"]:,} 원</p>
+</div>
+
+<div class="box">
+    <p><b>추천 입찰가</b></p>
+    <p>{report["price"]["recommended_bid"]:,} 원</p>
+</div>
+
+<div class="box">
+    <p><b>예상 매각가</b></p>
+    <p>{report["price"]["expected_sale_price"]:,} 원</p>
+</div>
+
+<div class="box">
+    <p><b>예상 총비용</b></p>
+    <p>{report["profit"]["total_cost"]:,} 원</p>
+</div>
+
+<div class="box">
+    <p><b>예상 수익</b></p>
+    <p>{report["profit"]["expected_profit"]:,} 원</p>
+</div>
+
+<div class="box">
+    <p><b>예상 수익률</b></p>
+    <p>{report["profit"]["expected_roi"]}%</p>
+</div>
+
+<div class="box summary">
+    <p><b>AI 요약</b></p>
+    <p>{report["summary"]}</p>
+</div>
+
+</div>
+</body>
+</html>
+"""
 
 @router.get("/decision/report/{result_id}")
 def get_decision_report(
@@ -262,6 +389,59 @@ def get_latest_decision_report(
         "report": report,
         "message": "최신 경매 종합 판정 리포트 생성 완료",
     }
+
+@router.get("/decision/report/html/{result_id}", response_class=HTMLResponse)
+def get_decision_html_report(
+    result_id: int,
+    db: Session = Depends(get_db),
+):
+    row = db.execute(
+        text("""
+            SELECT *
+            FROM auction_decision_results
+            WHERE id = :result_id
+        """),
+        {"result_id": result_id},
+    ).mappings().first()
+
+    if not row:
+        return HTMLResponse(
+            "<h1>Auction Decision Report Not Found</h1>",
+            status_code=404,
+        )
+
+    report = _build_decision_report(dict(row))
+    html = _build_decision_html_report(report)
+
+    return HTMLResponse(html)
+
+
+@router.get("/decision/report/html/latest/{document_id}", response_class=HTMLResponse)
+def get_latest_decision_html_report(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+    row = db.execute(
+        text("""
+            SELECT *
+            FROM auction_decision_results
+            WHERE document_id = :document_id
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+        """),
+        {"document_id": document_id},
+    ).mappings().first()
+
+    if not row:
+        return HTMLResponse(
+            "<h1>Latest Auction Decision Report Not Found</h1>",
+            status_code=404,
+        )
+
+    report = _build_decision_report(dict(row))
+    html = _build_decision_html_report(report)
+
+    return HTMLResponse(html)
 
 @router.get("/decision/result/latest/{document_id}")
 def get_latest_decision_result_by_document(
