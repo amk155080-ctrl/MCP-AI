@@ -24,6 +24,7 @@ from app.api.v15_auction_import import router as v15_auction_import_router
 from app.api.v16_document import router as v16_document_router
 from app.api import rights_ai
 from app.api.v19_cases import router as v19_cases_router
+from app.api.v16_rights_v2 import router as v16_rights_v2_router
 
 app = FastAPI(title="MCP 4.0 v1", version="1.0.0")
 
@@ -48,6 +49,7 @@ app.include_router(v16_document_router)
 app.include_router(rights_ai.router)
 app.include_router(rights_ai.router)
 app.include_router(v19_cases_router)
+app.include_router(v16_rights_v2_router)
 
 from app.api.v3.portfolio import router as portfolio_v3_router
 app.include_router(portfolio_v3_router)
@@ -237,3 +239,19 @@ app.include_router(ai_advisor_v13_router)
 app.include_router(
     v15_auction_asset_router
 )
+@app.get("/")
+def root():
+    return {
+        "status": "ok",
+        "service": "MCP AI",
+        "message": "MCP cloud server is running",
+    }
+
+
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy",
+        "version": "MCP Cloud",
+    }
+
